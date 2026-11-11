@@ -37,8 +37,18 @@
         @keyframes blink { 50% { opacity: 0; } }
 
         .slot-video { transform: scaleX(-1); }
-        .grid-slot { aspect-ratio: 16 / 9; }
         .hidden { display: none !important; }
+
+        .sbtn {
+            padding: 2px 4px; border-radius: 4px; background: rgba(0,0,0,.65);
+            color: #fff; font-size: 11px; line-height: 1.2; cursor: pointer;
+        }
+        .sbtn:hover { background: #4f46e5; }
+        .paste-btn { display: none; }
+        .has-clip .paste-btn { display: inline-block; background: rgba(5,150,105,.9); }
+        .has-clip .paste-btn:hover { background: #10b981; }
+
+        .orient-btn.active { border-color: #6366f1; background: rgba(79,70,229,.25); color: #fff; }
     </style>
 </head>
 <body class="min-h-screen flex flex-col justify-between overflow-x-hidden">
@@ -76,9 +86,14 @@
 
                 <div class="h-6 w-px bg-gray-800 hidden sm:block"></div>
 
+                <button id="emptyModeBtn" class="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-gray-800/80 hover:bg-gray-700/80 text-gray-300 text-xs font-medium border border-gray-700/60 transition-all">
+                    <i data-lucide="square-dashed" class="w-4 h-4 text-emerald-400"></i>
+                    <span>Ô trống</span>
+                </button>
+
                 <button id="changeGridBtn" class="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-gray-800/80 hover:bg-gray-700/80 text-gray-300 text-xs font-medium border border-gray-700/60 transition-all">
                     <i data-lucide="layout-grid" class="w-4 h-4 text-indigo-400"></i>
-                    <span>Đổi Số Ô (<span id="currentGridSizeLabel">16</span>)</span>
+                    <span>Đổi Số Ô / Hướng (<span id="currentGridSizeLabel">16</span>)</span>
                 </button>
 
                 <button id="clearAllBtn" class="p-2 rounded-xl bg-red-950/40 hover:bg-red-900/60 text-red-400 border border-red-900/50 transition-all" title="Xóa tất cả video">
@@ -88,7 +103,6 @@
         </div>
     </header>
 
-    <!-- Hidden Canvas for Export -->
     <canvas id="exportCanvas" class="hidden"></canvas>
 
     <!-- EXPORT PROGRESS MODAL -->
@@ -98,7 +112,7 @@
                 <i data-lucide="film" class="w-7 h-7"></i>
             </div>
             <h3 class="text-xl font-bold text-white mb-1">Đang Xuất Video</h3>
-            <p class="text-xs text-gray-400 mb-5">Đang hợp nhất các góc quay và đường tiếng thành 1 file duy nhất. Video sẽ được phát trong lúc xuất, vui lòng đợi đến khi xong.</p>
+            <p class="text-xs text-gray-400 mb-5">Âm thanh được trộn sẵn thành 1 track rồi ghi cùng hình. Video phát thật trong lúc xuất (loa tắt) nên thời gian xuất bằng độ dài clip dài nhất. Vui lòng đợi và đừng chuyển tab.</p>
 
             <div class="w-full bg-gray-800 rounded-full h-3 mb-3 overflow-hidden border border-gray-700">
                 <div id="exportProgressBar" class="bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 h-full transition-all duration-200" style="width: 0%"></div>
@@ -123,54 +137,72 @@
                 <span>Trạng thái: <strong id="recordedCount" class="text-white">0</strong> / <span id="totalCount">16</span> ô đã quay</span>
             </div>
             <div class="text-gray-400 italic hidden sm:block">
-                * Nhấp vào ô trống để mở máy ảnh & quay clip.
+                * Nhấp vào ô trống để quay. 📋 sao chép ô, 📥 dán.
             </div>
         </div>
 
-        <div id="gridContainer" class="grid gap-3 w-full transition-all duration-300"></div>
+        <div id="clipboardBar" class="hidden mb-3 px-4 py-2.5 rounded-xl bg-emerald-900/30 border border-emerald-700/50 text-xs text-emerald-200 flex flex-wrap items-center justify-between gap-2">
+            <span id="clipboardText">Đã sao chép</span>
+            <div class="flex items-center gap-2">
+                <button id="pasteNextBtn" class="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold">Dán vào ô trống kế tiếp</button>
+                <button id="clipCancelBtn" class="px-3 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 border border-gray-700">Hủy sao chép</button>
+            </div>
+        </div>
+
+        <div id="gridContainer" class="flex flex-col w-full mx-auto" style="gap:12px"></div>
     </main>
 
-    <!-- FOOTER -->
     <footer class="glass-panel py-3 px-4 text-center text-xs text-gray-500 border-t border-gray-800/80">
         Multi-Track Studio Grid Recorder &bull; Trực tiếp từ Webcam & Micro
     </footer>
 
     <!-- GRID SELECTION MODAL -->
-    <div id="gridSelectModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
-        <div class="glass-panel max-w-lg w-full rounded-2xl p-6 md:p-8 border border-gray-700/80 shadow-2xl relative text-center">
+    <div id="gridSelectModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md overflow-y-auto">
+        <div class="glass-panel max-w-2xl w-full rounded-2xl p-6 md:p-8 border border-gray-700/80 shadow-2xl relative text-center my-auto">
             <div class="w-16 h-16 mx-auto mb-4 rounded-2xl bg-indigo-600/20 border border-indigo-500/40 flex items-center justify-center text-indigo-400">
                 <i data-lucide="video" class="w-8 h-8"></i>
             </div>
 
             <h2 class="text-2xl font-bold text-white mb-2">Chọn Số Lượng Ô Quay</h2>
-            <p class="text-gray-400 text-sm mb-6">Bạn muốn chia lưới video thành bao nhiêu ô cho dàn xướng âm của mình?</p>
+            <p class="text-gray-400 text-sm mb-5">Chia lưới video cho dàn xướng âm của bạn, hoặc tự nhập số người.</p>
 
-            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-                <button data-size="16" class="grid-option-btn selected group p-5 rounded-xl glass-card hover:bg-indigo-600/20 hover:border-indigo-500 border border-indigo-500 bg-indigo-600/20 transition-all text-center flex flex-col items-center relative">
-                    <div class="check-badge absolute top-2 right-2 text-indigo-400">
-                        <i data-lucide="check-circle-2" class="w-5 h-5"></i>
-                    </div>
-                    <span class="text-3xl font-extrabold text-white group-hover:text-indigo-300 mb-1">16</span>
-                    <span class="text-xs font-semibold text-indigo-400 uppercase tracking-wider mb-2">4 x 4</span>
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
+                <button data-size="16" class="grid-option-btn selected group p-4 rounded-xl glass-card hover:border-indigo-500 border border-indigo-500 bg-indigo-600/20 transition-all text-center flex flex-col items-center relative">
+                    <div class="check-badge absolute top-2 right-2 text-indigo-400"><i data-lucide="check-circle-2" class="w-5 h-5"></i></div>
+                    <span class="text-3xl font-extrabold text-white mb-1">16</span>
+                    <span class="text-xs font-semibold text-indigo-400 uppercase tracking-wider mb-1">4 x 4</span>
                     <span class="text-[11px] text-gray-400">Chuẩn a cappella</span>
                 </button>
 
-                <button data-size="20" class="grid-option-btn group p-5 rounded-xl glass-card hover:bg-indigo-600/20 hover:border-indigo-500 border border-gray-700 transition-all text-center flex flex-col items-center relative">
-                    <div class="check-badge absolute top-2 right-2 text-indigo-400 hidden">
-                        <i data-lucide="check-circle-2" class="w-5 h-5"></i>
-                    </div>
-                    <span class="text-3xl font-extrabold text-white group-hover:text-indigo-300 mb-1">20</span>
-                    <span class="text-xs font-semibold text-indigo-400 uppercase tracking-wider mb-2">5 x 4</span>
+                <button data-size="20" class="grid-option-btn group p-4 rounded-xl glass-card hover:border-indigo-500 border border-gray-700 transition-all text-center flex flex-col items-center relative">
+                    <div class="check-badge absolute top-2 right-2 text-indigo-400 hidden"><i data-lucide="check-circle-2" class="w-5 h-5"></i></div>
+                    <span class="text-3xl font-extrabold text-white mb-1">20</span>
+                    <span class="text-xs font-semibold text-indigo-400 uppercase tracking-wider mb-1">5 x 4</span>
                     <span class="text-[11px] text-gray-400">Đa dạng nhạc cụ</span>
                 </button>
 
-                <button data-size="40" class="grid-option-btn group p-5 rounded-xl glass-card hover:bg-indigo-600/20 hover:border-indigo-500 border border-gray-700 transition-all text-center flex flex-col items-center relative">
-                    <div class="check-badge absolute top-2 right-2 text-indigo-400 hidden">
-                        <i data-lucide="check-circle-2" class="w-5 h-5"></i>
-                    </div>
-                    <span class="text-3xl font-extrabold text-white group-hover:text-indigo-300 mb-1">40</span>
-                    <span class="text-xs font-semibold text-indigo-400 uppercase tracking-wider mb-2">8 x 5</span>
+                <button data-size="40" class="grid-option-btn group p-4 rounded-xl glass-card hover:border-indigo-500 border border-gray-700 transition-all text-center flex flex-col items-center relative">
+                    <div class="check-badge absolute top-2 right-2 text-indigo-400 hidden"><i data-lucide="check-circle-2" class="w-5 h-5"></i></div>
+                    <span class="text-3xl font-extrabold text-white mb-1">40</span>
+                    <span class="text-xs font-semibold text-indigo-400 uppercase tracking-wider mb-1">8 x 5</span>
                     <span class="text-[11px] text-gray-400">Dàn giao hưởng lớn</span>
+                </button>
+
+                <div id="customCard" data-size="custom" class="grid-option-btn group p-4 rounded-xl glass-card hover:border-indigo-500 border border-gray-700 transition-all text-center flex flex-col items-center relative cursor-pointer">
+                    <div class="check-badge absolute top-2 right-2 text-indigo-400 hidden"><i data-lucide="check-circle-2" class="w-5 h-5"></i></div>
+                    <input id="customSizeInput" type="number" min="1" max="64" value="12" class="w-20 text-center bg-transparent border-b border-gray-500 text-3xl font-extrabold text-white outline-none mb-1">
+                    <span class="text-xs font-semibold text-indigo-400 uppercase tracking-wider mb-1">Tùy chọn</span>
+                    <span class="text-[11px] text-gray-400">Tự nhập số người (1-64)</span>
+                </div>
+            </div>
+
+            <p class="text-gray-400 text-sm mb-2">Hướng khung hình</p>
+            <div class="grid grid-cols-2 gap-3 mb-6">
+                <button data-orient="landscape" class="orient-btn active p-3 rounded-xl glass-card border border-gray-700 text-sm text-gray-300 transition-all">
+                    ▭ Ngang (16:9)
+                </button>
+                <button data-orient="portrait" class="orient-btn p-3 rounded-xl glass-card border border-gray-700 text-sm text-gray-300 transition-all">
+                    ▯ Dọc (9:16) &mdash; mặt không bị bẹp
                 </button>
             </div>
 
@@ -183,9 +215,73 @@
         </div>
     </div>
 
+    <!-- EMPTY SLOT MODAL -->
+    <div id="emptyModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md hidden overflow-y-auto">
+        <div class="glass-panel max-w-lg w-full rounded-2xl p-6 border border-gray-700/80 shadow-2xl my-auto">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-bold text-white">Xử lý các ô chưa quay</h3>
+                <button id="emptyCloseX" class="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800">✕</button>
+            </div>
+
+            <div class="space-y-2 text-sm text-gray-300 mb-4">
+                <label class="flex items-start gap-2 p-3 rounded-xl glass-card cursor-pointer">
+                    <input type="radio" name="emptyMode" value="placeholder" checked class="mt-1 accent-indigo-500">
+                    <span><strong class="text-white">Giữ chỗ trống</strong><br><span class="text-xs text-gray-400">Hiện đủ số ô như đã chọn, ô chưa quay để tối.</span></span>
+                </label>
+                <label class="flex items-start gap-2 p-3 rounded-xl glass-card cursor-pointer">
+                    <input type="radio" name="emptyMode" value="hide" class="mt-1 accent-indigo-500">
+                    <span><strong class="text-white">Ẩn ô trống</strong><br><span class="text-xs text-gray-400">Chỉ hiện các ô đã quay, lưới tự co lại cho vừa. Dùng nút "＋ Thêm ô" để quay tiếp.</span></span>
+                </label>
+                <label class="flex items-start gap-2 p-3 rounded-xl glass-card cursor-pointer">
+                    <input type="radio" name="emptyMode" value="banner" class="mt-1 accent-indigo-500">
+                    <span><strong class="text-white">Thay bằng khung banner</strong><br><span class="text-xs text-gray-400">Chỗ trống được lấp bằng 1 khung chữ, ảnh hoặc video.</span></span>
+                </label>
+            </div>
+
+            <div id="bannerBox" class="hidden space-y-3 text-xs text-gray-300 p-4 rounded-xl bg-gray-900/60 border border-gray-800 mb-4">
+                <div>
+                    <div class="mb-1 text-gray-400">Chữ trên banner</div>
+                    <textarea id="bannerText" rows="2" placeholder="Ví dụ: Tên bài hát / Tên nhóm" class="w-full rounded-lg bg-gray-800 border border-gray-700 px-3 py-2 text-white outline-none focus:border-indigo-500"></textarea>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <div class="mb-1 text-gray-400">Hoặc ảnh</div>
+                        <input id="bannerImageInput" type="file" accept="image/*" class="w-full text-[11px] file:mr-2 file:px-2 file:py-1 file:rounded file:border-0 file:bg-indigo-600 file:text-white">
+                    </div>
+                    <div>
+                        <div class="mb-1 text-gray-400">Hoặc video</div>
+                        <input id="bannerVideoInput" type="file" accept="video/*" class="w-full text-[11px] file:mr-2 file:px-2 file:py-1 file:rounded file:border-0 file:bg-indigo-600 file:text-white">
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <div class="mb-1 text-gray-400">Cỡ khung (số ô)</div>
+                        <select id="bannerSpan" class="w-full rounded-lg bg-gray-800 border border-gray-700 px-2 py-1.5 text-white">
+                            <option value="1">1 ô</option>
+                            <option value="2" selected>2 ô</option>
+                            <option value="3">3 ô</option>
+                            <option value="4">4 ô</option>
+                        </select>
+                    </div>
+                    <div>
+                        <div class="mb-1 text-gray-400">Màu nền (khi là chữ)</div>
+                        <input id="bannerBg" type="color" value="#3730a3" class="w-full h-8 rounded-lg bg-gray-800 border border-gray-700">
+                    </div>
+                </div>
+                <div class="flex items-center justify-between">
+                    <span id="bannerInfo" class="text-gray-400">Chưa có nội dung banner</span>
+                    <button id="bannerClearBtn" class="px-3 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 border border-gray-700">Xóa banner</button>
+                </div>
+                <p class="text-[11px] text-gray-500">Banner chỉ hiện khi vẫn còn ô chưa quay. Khi đủ ô, banner tự biến mất.</p>
+            </div>
+
+            <button id="emptyDoneBtn" class="w-full py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold text-sm">Xong</button>
+        </div>
+    </div>
+
     <!-- RECORDING MODAL -->
-    <div id="recordingModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md hidden">
-        <div class="glass-panel max-w-xl w-full rounded-2xl p-5 border border-gray-700 shadow-2xl relative flex flex-col">
+    <div id="recordingModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md hidden overflow-y-auto">
+        <div class="glass-panel max-w-xl w-full rounded-2xl p-5 border border-gray-700 shadow-2xl relative flex flex-col my-auto">
             <div class="flex items-center justify-between pb-3 mb-3 border-b border-gray-800">
                 <div class="flex items-center gap-2">
                     <span id="modalSlotBadge" class="px-2.5 py-1 rounded-md bg-indigo-600/30 text-indigo-300 text-xs font-semibold border border-indigo-500/30">
@@ -198,670 +294,7 @@
                 </button>
             </div>
 
-            <div class="relative w-full aspect-video bg-black rounded-xl overflow-hidden border border-gray-800 shadow-inner flex items-center justify-center">
+            <div id="previewBox" class="relative bg-black rounded-xl overflow-hidden border border-gray-800 shadow-inner flex items-center justify-center mx-auto" style="width:100%;aspect-ratio:16/9">
                 <video id="webcamPreview" autoplay playsinline muted class="w-full h-full object-cover transform -scale-x-100"></video>
 
-                <div id="countdownOverlay" class="absolute inset-0 bg-black/60 flex items-center justify-center text-7xl font-black text-indigo-400 hidden">
-                    3
-                </div>
-
-                <div id="recordingBadge" class="absolute top-3 left-3 px-3 py-1 rounded-full bg-red-600/90 text-white text-xs font-semibold flex items-center gap-2 hidden shadow-lg recording-glow">
-                    <span class="w-2 h-2 rounded-full bg-white recording-dot"></span>
-                    <span>Đang thu: <span id="recordTimer">00:00</span></span>
-                </div>
-            </div>
-
-            <label class="mt-3 flex items-center gap-2 text-xs text-gray-400 cursor-pointer select-none">
-                <input id="playAlongChk" type="checkbox" checked class="accent-indigo-500">
-                <span>Phát các ô đã quay khi thu (nên đeo tai nghe để micro không thu lại tiếng loa)</span>
-            </label>
-
-            <div class="mt-4 flex items-center justify-between">
-                <div class="text-xs text-gray-400">
-                    <span id="recordingStatusText">Đang mở máy ảnh...</span>
-                </div>
-
-                <div class="flex items-center gap-3">
-                    <button id="startRecordBtn" class="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white font-semibold text-sm shadow-lg shadow-red-900/40 transition-all active:scale-95">
-                        <i data-lucide="circle" class="w-4 h-4 fill-white"></i>
-                        <span>Bắt Đầu Quay</span>
-                    </button>
-
-                    <button id="stopRecordBtn" class="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gray-800 hover:bg-gray-700 text-white font-semibold text-sm border border-gray-700 transition-all active:scale-95 hidden">
-                        <i data-lucide="square" class="w-4 h-4 fill-white"></i>
-                        <span>Dừng & Lưu Ô</span>
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <script>
-        // ========== STATE ==========
-        const state = {
-            gridSize: 16,
-            activeSlotIndex: null,
-            recordedBlobs: {},
-            videoURLs: {},
-            durations: {},
-            slotLabels: {},
-            mediaStream: null,
-            mediaRecorder: null,
-            recordedChunks: [],
-            isRecording: false,
-            isCountingDown: false,
-            discardRecording: false,
-            recordTimerInterval: null,
-            recordSeconds: 0,
-            recordStartTime: 0,
-            isPlayingAll: false,
-            isExporting: false,
-            exportMediaRecorder: null,
-            exportAnimationFrame: null,
-            exportCancelled: false
-        };
-
-        const GRID_COLS = { 16: 4, 20: 5, 40: 8 };
-
-        // ========== DOM ==========
-        const $ = (id) => document.getElementById(id);
-        const gridSelectModal = $('gridSelectModal');
-        const gridContainer = $('gridContainer');
-        const changeGridBtn = $('changeGridBtn');
-        const currentGridSizeLabel = $('currentGridSizeLabel');
-        const recordedCountEl = $('recordedCount');
-        const totalCountEl = $('totalCount');
-        const clearAllBtn = $('clearAllBtn');
-        const playAllBtn = $('playAllBtn');
-        const playAllText = $('playAllText');
-        const stopAllBtn = $('stopAllBtn');
-        const exportVideoBtn = $('exportVideoBtn');
-        const exportModal = $('exportModal');
-        const exportProgressBar = $('exportProgressBar');
-        const exportProgressPercent = $('exportProgressPercent');
-        const exportStatusText = $('exportStatusText');
-        const cancelExportBtn = $('cancelExportBtn');
-        const exportCanvas = $('exportCanvas');
-        const recordingModal = $('recordingModal');
-        const webcamPreview = $('webcamPreview');
-        const countdownOverlay = $('countdownOverlay');
-        const recordingBadge = $('recordingBadge');
-        const recordTimer = $('recordTimer');
-        const recordingStatusText = $('recordingStatusText');
-        const startRecordBtn = $('startRecordBtn');
-        const stopRecordBtn = $('stopRecordBtn');
-        const closeRecorderBtn = $('closeRecorderBtn');
-        const modalSlotBadge = $('modalSlotBadge');
-        const confirmGridSelectionBtn = $('confirmGridSelectionBtn');
-        const playAlongChk = $('playAlongChk');
-
-        let tempSelectedSize = 16;
-
-        // ========== HELPERS ==========
-        function safeCreateIcons() {
-            try {
-                if (window.lucide && typeof lucide.createIcons === 'function') lucide.createIcons();
-            } catch (e) {
-                console.warn('Lucide icons error:', e);
-            }
-        }
-        safeCreateIcons();
-
-        function pad(n) { return String(n).padStart(2, '0'); }
-        function fmtTime(s) { return pad(Math.floor(s / 60)) + ':' + pad(Math.floor(s % 60)); }
-        function getSlotVideo(i) { return document.getElementById('slotVideo-' + i); }
-        function recordedIndexes() {
-            return Object.keys(state.videoURLs).map(Number).sort((a, b) => a - b);
-        }
-
-        function pickMimeType(list) {
-            if (typeof MediaRecorder === 'undefined') return '';
-            for (const t of list) {
-                try { if (MediaRecorder.isTypeSupported(t)) return t; } catch (e) {}
-            }
-            return '';
-        }
-
-        // ========== GRID ==========
-        function initGrid(size) {
-            state.gridSize = size;
-            currentGridSizeLabel.textContent = size;
-            totalCountEl.textContent = size;
-
-            const cols = GRID_COLS[size] || 4;
-            gridContainer.style.gridTemplateColumns = 'repeat(' + cols + ', minmax(0, 1fr))';
-            gridContainer.innerHTML = '';
-
-            for (let i = 0; i < size; i++) {
-                const slot = document.createElement('div');
-                slot.id = 'slot-' + i;
-                slot.className = 'grid-slot relative rounded-xl overflow-hidden glass-card border border-gray-700/60 hover:border-indigo-500/60 cursor-pointer transition-all flex items-center justify-center';
-                slot.addEventListener('click', () => onSlotClick(i));
-                gridContainer.appendChild(slot);
-                renderSlot(i);
-            }
-            updateStatus();
-            safeCreateIcons();
-        }
-
-        function renderSlot(i) {
-            const slot = $('slot-' + i);
-            if (!slot) return;
-            const label = state.slotLabels[i] || ('Ô ' + (i + 1));
-            const url = state.videoURLs[i];
-
-            if (!url) {
-                slot.innerHTML =
-                    '<div class="flex flex-col items-center gap-1 text-gray-500 pointer-events-none">' +
-                    '<i data-lucide="video" class="w-5 h-5"></i>' +
-                    '<span class="text-[11px] font-medium">' + label + '</span>' +
-                    '</div>';
-                return;
-            }
-
-            slot.innerHTML =
-                '<video id="slotVideo-' + i + '" class="slot-video w-full h-full object-cover" src="' + url + '" playsinline preload="auto"></video>' +
-                '<span class="absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded bg-black/60 text-[10px] text-white font-medium">' + label + '</span>' +
-                '<div class="absolute bottom-1.5 right-1.5 flex gap-1">' +
-                '<button data-act="play" class="p-1 rounded bg-black/60 hover:bg-emerald-600 text-white" title="Phát ô này"><i data-lucide="play" class="w-3.5 h-3.5"></i></button>' +
-                '<button data-act="redo" class="p-1 rounded bg-black/60 hover:bg-indigo-600 text-white" title="Quay lại"><i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i></button>' +
-                '<button data-act="del" class="p-1 rounded bg-black/60 hover:bg-red-600 text-white" title="Xóa ô này"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>' +
-                '</div>';
-
-            const v = getSlotVideo(i);
-            v.addEventListener('loadeddata', () => { try { if (v.currentTime === 0) v.currentTime = 0.01; } catch (e) {} });
-
-            slot.querySelectorAll('button[data-act]').forEach(btn => {
-                btn.addEventListener('click', (ev) => {
-                    ev.stopPropagation();
-                    const act = btn.getAttribute('data-act');
-                    if (act === 'play') {
-                        if (v.paused) { v.currentTime = 0; v.muted = false; v.play().catch(() => {}); }
-                        else v.pause();
-                    } else if (act === 'redo') {
-                        openRecorder(i);
-                    } else if (act === 'del') {
-                        deleteSlot(i);
-                    }
-                });
-            });
-        }
-
-        function onSlotClick(i) {
-            if (state.isExporting) return;
-            if (!state.videoURLs[i]) openRecorder(i);
-        }
-
-        function deleteSlot(i) {
-            stopAllPlayback();
-            if (state.videoURLs[i]) URL.revokeObjectURL(state.videoURLs[i]);
-            delete state.videoURLs[i];
-            delete state.recordedBlobs[i];
-            delete state.durations[i];
-            renderSlot(i);
-            updateStatus();
-            safeCreateIcons();
-        }
-
-        function updateStatus() {
-            recordedCountEl.textContent = Object.keys(state.videoURLs).length;
-            totalCountEl.textContent = state.gridSize;
-        }
-
-        function clearAllVideos() {
-            stopAllPlayback();
-            Object.values(state.videoURLs).forEach(u => URL.revokeObjectURL(u));
-            state.videoURLs = {};
-            state.recordedBlobs = {};
-            state.durations = {};
-            state.slotLabels = {};
-            if (gridContainer.children.length) initGrid(state.gridSize);
-            updateStatus();
-        }
-
-        // ========== MODAL / BUTTON EVENTS ==========
-        document.querySelectorAll('.grid-option-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                document.querySelectorAll('.grid-option-btn').forEach(b => {
-                    b.classList.remove('selected', 'border-indigo-500', 'bg-indigo-600/20');
-                    b.classList.add('border-gray-700');
-                    const badge = b.querySelector('.check-badge');
-                    if (badge) badge.classList.add('hidden');
-                });
-                btn.classList.add('selected', 'border-indigo-500', 'bg-indigo-600/20');
-                btn.classList.remove('border-gray-700');
-                const selectedBadge = btn.querySelector('.check-badge');
-                if (selectedBadge) selectedBadge.classList.remove('hidden');
-                tempSelectedSize = parseInt(btn.getAttribute('data-size')) || 16;
-            });
-        });
-
-        confirmGridSelectionBtn.addEventListener('click', function () {
-            try {
-                initGrid(tempSelectedSize || 16);
-                gridSelectModal.classList.add('hidden');
-            } catch (err) {
-                console.error('Lỗi khi khởi tạo lưới:', err);
-                alert('Có lỗi khi tạo lưới: ' + err.message);
-            }
-        });
-
-        changeGridBtn.addEventListener('click', () => {
-            if (state.isExporting) return;
-            if (Object.keys(state.videoURLs).length > 0) {
-                if (!confirm('Đổi số ô sẽ xóa toàn bộ video hiện tại. Bạn có chắc không?')) return;
-                clearAllVideos();
-            }
-            gridSelectModal.classList.remove('hidden');
-        });
-
-        clearAllBtn.addEventListener('click', () => {
-            if (state.isExporting) return;
-            if (Object.keys(state.videoURLs).length === 0) return;
-            if (!confirm('Xóa tất cả video đã quay?')) return;
-            clearAllVideos();
-        });
-
-        // ========== RECORDING ==========
-        async function openRecorder(i) {
-            if (state.isExporting) return;
-            stopAllPlayback();
-
-            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-                alert('Trình duyệt không hỗ trợ camera. Hãy mở trang qua https:// hoặc http://localhost (không mở trực tiếp file://) bằng Chrome/Edge/Firefox.');
-                return;
-            }
-            if (typeof MediaRecorder === 'undefined') {
-                alert('Trình duyệt này không hỗ trợ MediaRecorder.');
-                return;
-            }
-
-            state.activeSlotIndex = i;
-            modalSlotBadge.textContent = 'Ô số ' + (i + 1);
-            recordingModal.classList.remove('hidden');
-            startRecordBtn.classList.remove('hidden');
-            stopRecordBtn.classList.add('hidden');
-            recordingBadge.classList.add('hidden');
-            countdownOverlay.classList.add('hidden');
-            startRecordBtn.disabled = true;
-            recordingStatusText.textContent = 'Đang mở máy ảnh...';
-
-            try {
-                releaseStream();
-                try {
-                    state.mediaStream = await navigator.mediaDevices.getUserMedia({
-                        video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' },
-                        audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false }
-                    });
-                } catch (e1) {
-                    // Thử lại với cấu hình đơn giản nhất
-                    state.mediaStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-                }
-                webcamPreview.srcObject = state.mediaStream;
-                webcamPreview.play().catch(() => {});
-                startRecordBtn.disabled = false;
-                recordingStatusText.textContent = 'Sẵn sàng thu máy ảnh';
-            } catch (err) {
-                console.error(err);
-                recordingStatusText.textContent = 'Không mở được camera/micro';
-                alert('Không thể truy cập camera/micro: ' + err.message + '\nHãy cho phép quyền camera & micro cho trang này.');
-                closeRecorder();
-            }
-        }
-
-        function releaseStream() {
-            if (state.mediaStream) {
-                state.mediaStream.getTracks().forEach(t => t.stop());
-                state.mediaStream = null;
-            }
-            webcamPreview.srcObject = null;
-        }
-
-        function closeRecorder() {
-            if (state.isRecording && state.mediaRecorder && state.mediaRecorder.state !== 'inactive') {
-                state.discardRecording = true;
-                try { state.mediaRecorder.stop(); } catch (e) {}
-            }
-            state.isCountingDown = false;
-            clearInterval(state.recordTimerInterval);
-            stopAllPlayback();
-            releaseStream();
-            recordingModal.classList.add('hidden');
-            state.activeSlotIndex = null;
-        }
-
-        closeRecorderBtn.addEventListener('click', closeRecorder);
-
-        startRecordBtn.addEventListener('click', async () => {
-            if (!state.mediaStream || state.isRecording || state.isCountingDown) return;
-            state.isCountingDown = true;
-            startRecordBtn.disabled = true;
-            countdownOverlay.classList.remove('hidden');
-
-            for (let n = 3; n >= 1; n--) {
-                if (!state.isCountingDown) return; // đã đóng modal
-                countdownOverlay.textContent = n;
-                recordingStatusText.textContent = 'Chuẩn bị...';
-                await new Promise(r => setTimeout(r, 1000));
-            }
-            if (!state.isCountingDown) return;
-            state.isCountingDown = false;
-            countdownOverlay.classList.add('hidden');
-            beginRecording();
-        });
-
-        function beginRecording() {
-            const mime = pickMimeType([
-                'video/webm;codecs=vp9,opus',
-                'video/webm;codecs=vp8,opus',
-                'video/webm',
-                'video/mp4'
-            ]);
-
-            state.recordedChunks = [];
-            state.discardRecording = false;
-
-            try {
-                state.mediaRecorder = new MediaRecorder(state.mediaStream, mime ? { mimeType: mime } : undefined);
-            } catch (err) {
-                alert('Không thể bắt đầu quay: ' + err.message);
-                startRecordBtn.disabled = false;
-                return;
-            }
-
-            const slotIndex = state.activeSlotIndex;
-            const recorder = state.mediaRecorder;
-
-            recorder.ondataavailable = (e) => {
-                if (e.data && e.data.size > 0) state.recordedChunks.push(e.data);
-            };
-
-            recorder.onstop = () => {
-                state.isRecording = false;
-                clearInterval(state.recordTimerInterval);
-                stopAllPlayback();
-
-                if (state.discardRecording || !state.recordedChunks.length) return;
-
-                const blob = new Blob(state.recordedChunks, { type: recorder.mimeType || mime || 'video/webm' });
-                if (state.videoURLs[slotIndex]) URL.revokeObjectURL(state.videoURLs[slotIndex]);
-                state.recordedBlobs[slotIndex] = blob;
-                state.videoURLs[slotIndex] = URL.createObjectURL(blob);
-                state.durations[slotIndex] = (performance.now() - state.recordStartTime) / 1000;
-
-                renderSlot(slotIndex);
-                updateStatus();
-                safeCreateIcons();
-                closeRecorder();
-            };
-
-            // Phát các ô đã quay để hát/đàn theo
-            if (playAlongChk.checked) {
-                recordedIndexes().forEach(idx => {
-                    if (idx === slotIndex) return;
-                    const v = getSlotVideo(idx);
-                    if (v) { v.currentTime = 0; v.muted = false; v.play().catch(() => {}); }
-                });
-            }
-
-            state.recordStartTime = performance.now();
-            recorder.start(250);
-            state.isRecording = true;
-
-            state.recordSeconds = 0;
-            recordTimer.textContent = '00:00';
-            recordingBadge.classList.remove('hidden');
-            startRecordBtn.classList.add('hidden');
-            stopRecordBtn.classList.remove('hidden');
-            recordingStatusText.textContent = 'Đang thu...';
-
-            state.recordTimerInterval = setInterval(() => {
-                state.recordSeconds++;
-                recordTimer.textContent = fmtTime(state.recordSeconds);
-            }, 1000);
-        }
-
-        stopRecordBtn.addEventListener('click', () => {
-            if (state.mediaRecorder && state.mediaRecorder.state !== 'inactive') {
-                recordingStatusText.textContent = 'Đang lưu...';
-                state.mediaRecorder.stop();
-            }
-        });
-
-        // ========== PLAYBACK ==========
-        function playAll() {
-            const idxs = recordedIndexes();
-            if (!idxs.length) { alert('Chưa có ô nào được quay.'); return; }
-            state.isPlayingAll = true;
-            playAllText.textContent = 'Đang phát...';
-
-            let remaining = idxs.length;
-            idxs.forEach(i => {
-                const v = getSlotVideo(i);
-                if (!v) { remaining--; return; }
-                v.onended = () => {
-                    remaining--;
-                    if (remaining <= 0) stopAllPlayback();
-                };
-                v.currentTime = 0;
-                v.muted = false;
-            });
-            // Phát đồng loạt sau khi đã tua về 0
-            idxs.forEach(i => {
-                const v = getSlotVideo(i);
-                if (v) v.play().catch(() => {});
-            });
-        }
-
-        function stopAllPlayback() {
-            state.isPlayingAll = false;
-            playAllText.textContent = 'Phát Tất Cả';
-            recordedIndexes().forEach(i => {
-                const v = getSlotVideo(i);
-                if (v) {
-                    v.onended = null;
-                    v.pause();
-                    try { v.currentTime = 0.01; } catch (e) {}
-                }
-            });
-        }
-
-        playAllBtn.addEventListener('click', () => {
-            if (state.isExporting || state.isRecording) return;
-            if (state.isPlayingAll) stopAllPlayback(); else playAll();
-        });
-        stopAllBtn.addEventListener('click', () => { if (!state.isExporting) stopAllPlayback(); });
-
-        // ========== EXPORT ==========
-        let audioCtx = null;
-        const audioSources = new WeakMap();
-
-        function getAudioSource(video) {
-            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-            let src = audioSources.get(video);
-            if (!src) {
-                src = audioCtx.createMediaElementSource(video);
-                src.connect(audioCtx.destination); // vẫn nghe được khi phát bình thường
-                audioSources.set(video, src);
-            }
-            return src;
-        }
-
-        function setExportProgress(pct, text) {
-            const p = Math.max(0, Math.min(100, Math.round(pct)));
-            exportProgressBar.style.width = p + '%';
-            exportProgressPercent.textContent = p + '%';
-            if (text) exportStatusText.textContent = text;
-        }
-
-        exportVideoBtn.addEventListener('click', async () => {
-            if (state.isExporting || state.isRecording) return;
-            const idxs = recordedIndexes();
-            if (!idxs.length) { alert('Chưa có ô nào được quay.'); return; }
-            if (typeof MediaRecorder === 'undefined' || !exportCanvas.captureStream) {
-                alert('Trình duyệt không hỗ trợ xuất video (cần Chrome/Edge/Firefox bản mới).');
-                return;
-            }
-            await runExport(idxs);
-        });
-
-        cancelExportBtn.addEventListener('click', () => {
-            state.exportCancelled = true;
-            if (state.exportMediaRecorder && state.exportMediaRecorder.state !== 'inactive') {
-                try { state.exportMediaRecorder.stop(); } catch (e) {}
-            }
-        });
-
-        async function runExport(idxs) {
-            stopAllPlayback();
-            state.isExporting = true;
-            state.exportCancelled = false;
-            exportModal.classList.remove('hidden');
-            setExportProgress(0, 'Đang khởi tạo...');
-
-            const cols = GRID_COLS[state.gridSize] || 4;
-            const rows = Math.ceil(state.gridSize / cols);
-            const cellW = state.gridSize > 20 ? 240 : 320;
-            const cellH = Math.round(cellW * 9 / 16);
-            exportCanvas.width = cols * cellW;
-            exportCanvas.height = rows * cellH;
-            const ctx = exportCanvas.getContext('2d');
-
-            const videos = idxs.map(i => ({ i, v: getSlotVideo(i) })).filter(o => o.v);
-            const maxDur = Math.max(1, ...idxs.map(i => state.durations[i] || 0));
-
-            // Trộn âm thanh
-            let streamDest = null;
-            try {
-                if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-                if (audioCtx.state === 'suspended') await audioCtx.resume();
-                streamDest = audioCtx.createMediaStreamDestination();
-                videos.forEach(o => getAudioSource(o.v).connect(streamDest));
-            } catch (e) {
-                console.warn('Không trộn được âm thanh:', e);
-                streamDest = null;
-            }
-
-            const canvasStream = exportCanvas.captureStream(30);
-            const tracks = [...canvasStream.getVideoTracks()];
-            if (streamDest) tracks.push(...streamDest.stream.getAudioTracks());
-            const outStream = new MediaStream(tracks);
-
-            const mime = pickMimeType([
-                'video/mp4;codecs=avc1.42E01E,mp4a.40.2',
-                'video/mp4',
-                'video/webm;codecs=vp9,opus',
-                'video/webm;codecs=vp8,opus',
-                'video/webm'
-            ]);
-            const ext = mime.indexOf('mp4') !== -1 ? 'mp4' : 'webm';
-
-            let recorder;
-            try {
-                recorder = new MediaRecorder(outStream, Object.assign(
-                    { videoBitsPerSecond: 6000000 },
-                    mime ? { mimeType: mime } : {}
-                ));
-            } catch (err) {
-                alert('Không thể khởi tạo bộ xuất video: ' + err.message);
-                finishExport(videos, streamDest);
-                return;
-            }
-            state.exportMediaRecorder = recorder;
-
-            const chunks = [];
-            recorder.ondataavailable = (e) => { if (e.data && e.data.size > 0) chunks.push(e.data); };
-
-            const done = new Promise(resolve => { recorder.onstop = resolve; });
-
-            // Tua về 0 rồi phát đồng loạt
-            let endedCount = 0;
-            videos.forEach(o => {
-                o.ended = false;
-                o.v.onended = () => { if (!o.ended) { o.ended = true; endedCount++; } };
-                o.v.currentTime = 0;
-                o.v.muted = false;
-            });
-
-            setExportProgress(2, 'Đang ghi hình...');
-            recorder.start(500);
-            const t0 = performance.now();
-            videos.forEach(o => o.v.play().catch(() => {}));
-
-            function drawFrame() {
-                ctx.fillStyle = '#000';
-                ctx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
-
-                for (let s = 0; s < state.gridSize; s++) {
-                    const x = (s % cols) * cellW;
-                    const y = Math.floor(s / cols) * cellH;
-                    const o = videos.find(a => a.i === s);
-                    if (o && o.v.readyState >= 2) {
-                        ctx.save();
-                        ctx.translate(x + cellW, y);
-                        ctx.scale(-1, 1); // giống ô hiển thị (lật gương)
-                        ctx.drawImage(o.v, 0, 0, cellW, cellH);
-                        ctx.restore();
-                    } else {
-                        ctx.fillStyle = '#111827';
-                        ctx.fillRect(x + 1, y + 1, cellW - 2, cellH - 2);
-                    }
-                }
-
-                const elapsed = (performance.now() - t0) / 1000;
-                setExportProgress(Math.min(98, (elapsed / maxDur) * 100), 'Đang ghi hình...');
-
-                const allEnded = endedCount >= videos.length;
-                if (state.exportCancelled) return;
-                if (allEnded || elapsed > maxDur + 5) {
-                    setTimeout(() => {
-                        if (recorder.state !== 'inactive') recorder.stop();
-                    }, 400);
-                    return;
-                }
-                state.exportAnimationFrame = requestAnimationFrame(drawFrame);
-            }
-            drawFrame();
-
-            await done;
-            cancelAnimationFrame(state.exportAnimationFrame);
-            const cancelled = state.exportCancelled;
-            finishExport(videos, streamDest);
-
-            if (cancelled || !chunks.length) return;
-
-            const blob = new Blob(chunks, { type: recorder.mimeType || mime || 'video/webm' });
-            const a = document.createElement('a');
-            a.href = URL.createObjectURL(blob);
-            a.download = 'a-cappella-grid-' + Date.now() + '.' + ext;
-            document.body.appendChild(a);
-            a.click();
-            a.remove();
-            setTimeout(() => URL.revokeObjectURL(a.href), 10000);
-
-            if (ext === 'webm') {
-                alert('Trình duyệt này chỉ xuất được định dạng WebM (không phải MP4 thật). Chrome/Edge bản mới sẽ xuất MP4 trực tiếp.');
-            }
-        }
-
-        function finishExport(videos, streamDest) {
-            cancelAnimationFrame(state.exportAnimationFrame);
-            videos.forEach(o => {
-                o.v.onended = null;
-                o.v.pause();
-                try { o.v.currentTime = 0.01; } catch (e) {}
-                try {
-                    const src = audioSources.get(o.v);
-                    if (src && streamDest) src.disconnect(streamDest);
-                } catch (e) {}
-            });
-            state.exportMediaRecorder = null;
-            state.isExporting = false;
-            exportModal.classList.add('hidden');
-        }
-
-        // Giải phóng camera khi rời trang
-        window.addEventListener('beforeunload', releaseStream);
-    </script>
-</body>
-</html>
+                <div id="countdownOverlay" class="abs
