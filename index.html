@@ -48,7 +48,9 @@
         .has-clip .paste-btn { display: inline-block; background: rgba(5,150,105,.9); }
         .has-clip .paste-btn:hover { background: #10b981; }
 
-        .orient-btn.active { border-color: #6366f1; background: rgba(79,70,229,.25); color: #fff; }
+        .orient-btn { display:flex; align-items:center; justify-content:center; gap:10px; touch-action:manipulation; -webkit-tap-highlight-color:transparent; cursor:pointer; }
+        .orient-shape { display:inline-block; border:2px solid currentColor; border-radius:3px; flex:none; }
+        .orient-btn.active { border-color: #6366f1; background: rgba(79,70,229,.35); color: #fff; box-shadow: 0 0 0 2px rgba(99,102,241,.45); }
     </style>
 </head>
 <body class="min-h-screen flex flex-col justify-between overflow-x-hidden">
@@ -197,21 +199,24 @@
             </div>
 
             <p class="text-gray-400 text-sm mb-2">Hướng khung hình</p>
-            <div class="grid grid-cols-2 gap-3 mb-6">
-                <button data-orient="landscape" class="orient-btn active p-3 rounded-xl glass-card border border-gray-700 text-sm text-gray-300 transition-all">
-                    ▭ Ngang (16:9)
+            <div class="grid grid-cols-2 gap-3 mb-2">
+                <button type="button" data-orient="landscape" class="orient-btn active p-3 rounded-xl glass-card border border-gray-700 text-sm text-gray-300 transition-all">
+                    <span class="orient-shape" style="width:26px;height:15px"></span>
+                    <span>Ngang 16:9</span>
                 </button>
-                <button data-orient="portrait" class="orient-btn p-3 rounded-xl glass-card border border-gray-700 text-sm text-gray-300 transition-all">
-                    ▯ Dọc (9:16) &mdash; mặt không bị bẹp
+                <button type="button" data-orient="portrait" class="orient-btn p-3 rounded-xl glass-card border border-gray-700 text-sm text-gray-300 transition-all">
+                    <span class="orient-shape" style="width:15px;height:26px"></span>
+                    <span>Dọc 9:16</span>
                 </button>
             </div>
+            <p id="orientHint" class="text-xs text-indigo-300 mb-6">Đã chọn: Ngang (16:9)</p>
 
             <button id="confirmGridSelectionBtn" class="w-full py-3.5 px-6 rounded-xl bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold text-base shadow-lg shadow-indigo-600/30 transition-all active:scale-[0.98] flex items-center justify-center gap-2 mb-4">
                 <span>Tiếp Tục Bắt Đầu</span>
                 <i data-lucide="arrow-right" class="w-5 h-5"></i>
             </button>
 
-            <p class="text-xs text-gray-500">Lưu ý: Mọi video đều được thu trực tiếp bằng camera thiết bị.</p>
+            <p class="text-xs text-gray-500">Lưu ý: Mọi video đều được thu trực tiếp bằng camera thiết bị. <span class="opacity-60">(phiên bản 4)</span></p>
         </div>
     </div>
 
@@ -287,14 +292,4 @@
                     <span id="modalSlotBadge" class="px-2.5 py-1 rounded-md bg-indigo-600/30 text-indigo-300 text-xs font-semibold border border-indigo-500/30">
                         Ô số 1
                     </span>
-                    <h3 class="font-semibold text-white text-base">Thu Video Trực Tiếp</h3>
-                </div>
-                <button id="closeRecorderBtn" class="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 transition-all">
-                    <i data-lucide="x" class="w-5 h-5"></i>
-                </button>
-            </div>
-
-            <div id="previewBox" class="relative bg-black rounded-xl overflow-hidden border border-gray-800 shadow-inner flex items-center justify-center mx-auto" style="width:100%;aspect-ratio:16/9">
-                <video id="webcamPreview" autoplay playsinline muted class="w-full h-full object-cover transform -scale-x-100"></video>
-
-                <div id="countdownOverlay" class="abs
+                    <h3 class="font-semibold text-white text-base">Thu Video Trực Tiếp
